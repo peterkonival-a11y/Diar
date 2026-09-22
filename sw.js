@@ -1,28 +1,3 @@
-None selected 
-
-Skip to content
-Using Gmail with screen readers
-1 of 188
-sw
-Inbox
-
-Peter Ihi <peter.konival@gmail.com>
-Attachments
-10:57 PM (3 minutes ago)
-to me
-
- One attachment
-  •  Scanned by Gmail
-Anti-virus warning – 1 attachment contains a virus or blocked file. Downloading this attachment is disabled.
-
-Mail Delivery Subsystem <mailer-daemon@googlemail.com>
-10:57 PM (3 minutes ago)
-to me
-
-For security reasons, Gmail does not allow you to use this type of file as it violates Google policy for executables and archives.
-
-
-
 const CACHE_NAME = 'diar-v1';
 const ASSETS = [
   './',
@@ -63,5 +38,3 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
-sw.js
-Displaying sw.js.
