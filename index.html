@@ -1,0 +1,2626 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Diár</title>
+  <meta name="theme-color" content="#e09aaa">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Diár">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <!-- OneSignal (push aj pri zatvorenej appke) – nastav APP ID nižšie v scripte -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <style>
+    :root {
+      --bg: #f8eef1;
+      --text: #5c3d48;
+      --muted: #a07a88;
+      --accent: #e09aaa;
+      --accent-deep: #c97a8c;
+      --glass: rgba(255, 248, 250, 0.42);
+      --glass-strong: rgba(255, 250, 252, 0.68);
+      --glass-border: rgba(255, 255, 255, 0.58);
+      --shadow: 0 10px 40px rgba(160, 90, 110, 0.14);
+      --radius: 20px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-gradient, linear-gradient(160deg, #fdf4f7 0%, #f5e6ec 45%, #ebe0f0 100%));
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      min-height: 100dvh;
+      line-height: 1.5;
+      overflow-x: hidden;
+      padding-bottom: calc(80px + var(--safe-bottom));
+      transition: background 0.4s ease, color 0.3s ease;
+    }
+
+    /* Liquid blobs */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.48;
+      pointer-events: none;
+      z-index: 0;
+      animation: liquid 18s ease-in-out infinite alternate;
+    }
+    .blob-1 { width: 420px; height: 420px; background: #f0b8c8; top: -120px; left: -100px; }
+    .blob-2 { width: 360px; height: 360px; background: #d8b8e8; bottom: -80px; right: -70px; animation-delay: -6s; }
+    .blob-3 { width: 260px; height: 260px; background: #e8c8d8; top: 45%; left: 40%; opacity: 0.32; animation-delay: -12s; }
+    @keyframes liquid {
+      0%   { transform: translate(0,0) scale(1); }
+      50%  { transform: translate(25px,-18px) scale(1.07); }
+      100% { transform: translate(-18px,12px) scale(0.96); }
+    }
+
+    /* Floating symbols background */
+    .hearts {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .heart {
+      position: absolute;
+      color: var(--float-color, rgba(224, 154, 170, 0.22));
+      font-size: 1.2rem;
+      animation: floatHeart linear infinite;
+      user-select: none;
+    }
+    .heart.soft { opacity: 0.75; }
+    .heart.tiny { font-size: 0.75rem; opacity: 0.65; }
+    .heart.big { font-size: 1.8rem; opacity: 0.5; }
+    @keyframes floatHeart {
+      0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 0.7; }
+      100% { transform: translateY(-100vh) rotate(25deg) scale(1.1); opacity: 0; }
+    }
+
+    /* Theme + language settings */
+    .settings-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 14px;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      background: var(--glass-strong);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+    .settings-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .settings-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .theme-dots {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .theme-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.8);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .theme-dot:hover { transform: scale(1.1); }
+    .theme-dot.active {
+      box-shadow: 0 0 0 3px var(--accent), 0 2px 8px rgba(0,0,0,0.12);
+      transform: scale(1.12);
+    }
+    .lang-switch {
+      display: flex;
+      gap: 4px;
+      background: rgba(255,255,255,0.35);
+      border-radius: 999px;
+      padding: 3px;
+    }
+    .lang-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: inherit;
+      min-height: 32px;
+    }
+    .lang-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+      color: #fff;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 16px 14px 20px;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      gap: 10px;
+    }
+    .weather-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--glass-strong);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: var(--text);
+      min-height: 40px;
+      max-width: 55%;
+      user-select: none;
+    }
+    .weather-chip:active { transform: scale(0.97); }
+    .weather-icon { font-size: 1.15rem; line-height: 1; }
+    .weather-temp { font-weight: 700; white-space: nowrap; }
+    .weather-place {
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 90px;
+    }
+    @media (min-width: 500px) {
+      .weather-place { max-width: 140px; font-size: 0.78rem; }
+    }
+    h1 {
+      font-size: 1.55rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #c97a8c 0%, #b88ac0 60%, #d494a8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .clover {
+      display: inline-block;
+      width: 1.35em;
+      height: 1.35em;
+      position: relative;
+      flex-shrink: 0;
+      filter: drop-shadow(0 2px 4px rgba(120, 170, 130, 0.25));
+    }
+    .clover span {
+      position: absolute;
+      width: 0.55em;
+      height: 0.55em;
+      background: linear-gradient(145deg, #b8e0c0 0%, #8ecf9a 50%, #7ec090 100%);
+      border-radius: 50% 50% 50% 0;
+      box-shadow: inset 0 1px 2px rgba(255,255,255,0.5);
+    }
+    .clover span:nth-child(1) { top: 0; left: 50%; transform: translateX(-50%) rotate(-45deg); }
+    .clover span:nth-child(2) { top: 50%; right: 0; transform: translateY(-50%) rotate(45deg); }
+    .clover span:nth-child(3) { bottom: 0; left: 50%; transform: translateX(-50%) rotate(135deg); }
+    .clover span:nth-child(4) { top: 50%; left: 0; transform: translateY(-50%) rotate(-135deg); }
+    .clover::after {
+      content: '';
+      position: absolute;
+      bottom: -0.15em;
+      left: 50%;
+      width: 0.12em;
+      height: 0.4em;
+      background: linear-gradient(180deg, #7ec090, #6ab080);
+      border-radius: 2px;
+      transform: translateX(-50%);
+    }
+
+    .view-switcher {
+      display: flex;
+      gap: 4px;
+      background: var(--glass);
+      backdrop-filter: blur(22px) saturate(1.4);
+      -webkit-backdrop-filter: blur(22px) saturate(1.4);
+      padding: 4px;
+      border-radius: 14px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow);
+    }
+    .view-btn {
+      padding: 8px 12px;
+      border: none;
+      background: transparent;
+      border-radius: 11px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.8rem;
+      color: var(--muted);
+      transition: all 0.22s ease;
+      white-space: nowrap;
+    }
+    .view-btn.active {
+      background: linear-gradient(135deg, #e09aaa, #d08098);
+      color: #fff;
+      box-shadow: 0 3px 14px rgba(200, 120, 140, 0.4);
+    }
+
+    /* ===== LAYOUT ===== */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    @media (min-width: 820px) {
+      .main { grid-template-columns: 260px 1fr; gap: 18px; }
+      body { padding-bottom: calc(88px + var(--safe-bottom)); }
+      .app { padding: 24px 18px 40px; }
+      h1 { font-size: 1.9rem; }
+      .fab { display: none !important; }
+      .mobile-nav {
+        max-width: 520px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 20px 20px 0 0;
+      }
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* On mobile: categories as horizontal scroll chips */
+    .categories-mobile {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 2px 10px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .categories-mobile::-webkit-scrollbar { display: none; }
+
+    .cat-chip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 14px;
+      border-radius: 50px;
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 10px rgba(160,90,110,0.08);
+      white-space: nowrap;
+    }
+    .cat-chip:active { transform: scale(0.96); }
+    .cat-chip .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.6);
+    }
+
+    @media (min-width: 820px) {
+      .categories-mobile { display: none; }
+      .sidebar-desktop { display: flex !important; }
+    }
+    .sidebar-desktop { display: none; flex-direction: column; gap: 14px; }
+
+    /* Liquid Glass card */
+    .card {
+      background: var(--glass);
+      backdrop-filter: blur(24px) saturate(1.5);
+      -webkit-backdrop-filter: blur(24px) saturate(1.5);
+      border-radius: var(--radius);
+      padding: 16px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.55);
+      position: relative;
+      overflow: hidden;
+    }
+    @media (min-width: 820px) { .card { padding: 20px; } }
+
+    .card h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px 18px;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.22s ease;
+      min-height: 44px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #e09aaa, #d08098);
+      color: #fff;
+      box-shadow: 0 5px 18px rgba(200, 120, 140, 0.35);
+    }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-secondary {
+      background: var(--glass-strong);
+      color: var(--text);
+      border: 1px solid var(--glass-border);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 10px;
+      min-height: 40px;
+    }
+    .btn-ghost:active { background: rgba(255,255,255,0.5); }
+    .btn-back {
+      background: var(--glass-strong);
+      color: var(--text);
+      border: 1px solid var(--glass-border);
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-size: 0.9rem;
+      margin-bottom: 14px;
+      min-height: 44px;
+    }
+
+    /* ===== CATEGORIES DESKTOP ===== */
+    .category-list { display: flex; flex-direction: column; gap: 4px; }
+    .category-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 12px;
+      border-radius: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      min-height: 44px;
+    }
+    .category-item:hover, .category-item:active {
+      background: rgba(255,255,255,0.55);
+    }
+    .cat-color {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.6);
+    }
+    .cat-name { flex: 1; font-size: 0.92rem; }
+
+    /* ===== FORMS ===== */
+    input, select, textarea {
+      padding: 13px 14px;
+      border: 1px solid rgba(200, 120, 140, 0.18);
+      border-radius: 14px;
+      font-size: 16px; /* prevents iOS zoom */
+      background: rgba(255,255,255,0.55);
+      color: var(--text);
+      outline: none;
+      transition: all 0.2s;
+      width: 100%;
+      backdrop-filter: blur(10px);
+      min-height: 46px;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      background: rgba(255,255,255,0.8);
+      box-shadow: 0 0 0 3px rgba(224, 154, 170, 0.22);
+    }
+    textarea { min-height: 70px; resize: vertical; }
+
+    .color-picker { display: flex; gap: 10px; flex-wrap: wrap; }
+    .color-option {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: all 0.15s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .color-option.selected {
+      border-color: var(--text);
+      transform: scale(1.12);
+    }
+
+    /* ===== CALENDAR ===== */
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .calendar-header h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    @media (min-width: 820px) {
+      .calendar-header h2 { font-size: 1.22rem; }
+    }
+    .nav-btns { display: flex; gap: 4px; }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    @media (min-width: 500px) { .calendar-grid { gap: 5px; } }
+
+    .day-name {
+      text-align: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 6px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    @media (min-width: 500px) { .day-name { font-size: 0.75rem; } }
+
+    .day-cell {
+      aspect-ratio: 1;
+      border-radius: 12px;
+      padding: 3px;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      background: rgba(255,255,255,0.28);
+      border: 1px solid transparent;
+      min-height: 40px;
+    }
+    @media (min-width: 500px) {
+      .day-cell { border-radius: 14px; padding: 5px; min-height: 48px; }
+    }
+    .day-cell:active {
+      background: rgba(255,255,255,0.55);
+    }
+    .day-cell.other-month { opacity: 0.25; }
+    .day-cell.today {
+      background: color-mix(in srgb, var(--accent) 22%, white);
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    .day-cell.selected {
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+      color: #fff;
+      box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    .day-number { font-size: 0.82rem; margin-top: 2px; }
+    @media (min-width: 500px) { .day-number { font-size: 0.9rem; } }
+    .day-meniny {
+      font-size: 0.48rem;
+      line-height: 1.1;
+      margin-top: 1px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      opacity: 0.75;
+      padding: 0 1px;
+      text-align: center;
+    }
+    @media (min-width: 500px) {
+      .day-meniny { font-size: 0.58rem; white-space: normal; max-height: 2.2em; }
+    }
+    .day-cell.selected .day-meniny { opacity: 0.9; }
+
+    .day-dots {
+      display: flex; gap: 2px; margin-top: 2px;
+      flex-wrap: wrap; justify-content: center;
+    }
+    .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.45);
+    }
+
+    /* ===== WEEK ===== */
+    .week-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    @media (min-width: 700px) {
+      .week-grid { grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    }
+    .week-day {
+      background: rgba(255,255,255,0.3);
+      border-radius: 16px;
+      padding: 12px;
+      min-height: auto;
+      border: 1px solid var(--glass-border);
+    }
+    @media (min-width: 700px) { .week-day { min-height: 150px; } }
+    .week-day.today {
+      background: rgba(180, 210, 230, 0.38);
+      border-color: #a0c0d8;
+    }
+    .week-day-header {
+      font-weight: 600;
+      font-size: 0.88rem;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .week-task {
+      background: rgba(255,255,255,0.65);
+      border-radius: 11px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      font-size: 0.88rem;
+      border-left: 4px solid;
+      cursor: pointer;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+    }
+    .week-task:active { opacity: 0.85; }
+    .week-task.done { opacity: 0.45; text-decoration: line-through; }
+
+    /* ===== TASK LIST ===== */
+    .task-list { display: flex; flex-direction: column; gap: 8px; }
+    .task-item {
+      background: rgba(255,255,255,0.42);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      border-left: 5px solid;
+      transition: all 0.18s;
+      border: 1px solid transparent;
+      border-left-width: 5px;
+      min-height: 56px;
+    }
+    .task-item:active {
+      background: rgba(255,255,255,0.65);
+    }
+    .task-item.done { opacity: 0.48; }
+    .task-item.done .task-title { text-decoration: line-through; }
+
+    .task-check {
+      width: 26px; height: 26px;
+      border-radius: 8px;
+      border: 2px solid var(--muted);
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .task-item.done .task-check {
+      background: #c8e0d0;
+      border-color: #98c0a8;
+      color: #4a7a5a;
+    }
+    .task-content { flex: 1; cursor: pointer; min-width: 0; }
+    .task-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+      font-size: 0.95rem;
+      word-break: break-word;
+    }
+    .task-meta { font-size: 0.78rem; color: var(--muted); }
+    .task-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+    /* ===== DAY DETAIL ===== */
+    .day-detail {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(200, 120, 140, 0.15);
+    }
+    .day-detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .day-detail-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .day-detail-meniny {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .day-detail-meniny .meniny-icon {
+      font-size: 1rem;
+    }
+
+    /* ===== NOTES ===== */
+    .notes-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .notes-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .note-block {
+      background: rgba(255,255,255,0.45);
+      border: 1px solid rgba(200, 120, 140, 0.15);
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(8px);
+    }
+    .note-block-header {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .note-block-header input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+      padding: 6px 4px;
+      outline: none;
+      font-family: inherit;
+    }
+    .note-block-header input::placeholder { color: var(--muted); }
+    .note-block textarea {
+      width: 100%;
+      min-height: 120px;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text);
+      resize: vertical;
+      font-family: inherit;
+      outline: none;
+    }
+    .note-block textarea::placeholder { color: var(--muted); opacity: 0.7; }
+    .note-block-del {
+      border: none;
+      background: transparent;
+      color: #c06070;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      min-height: 36px;
+    }
+    .note-block-del:hover { background: rgba(200,100,120,0.1); }
+
+    /* ===== CATEGORY PAGE ===== */
+    .category-page { display: none; }
+    .category-page.active { display: block; }
+
+    .category-page-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .category-page-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .category-page-dot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.5);
+      flex-shrink: 0;
+    }
+    .category-stats {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(90, 50, 65, 0.3);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 200;
+      padding: 0;
+    }
+    @media (min-width: 520px) {
+      .modal-overlay {
+        align-items: center;
+        padding: 18px;
+      }
+    }
+    .modal-overlay.open { display: flex; }
+
+    /* Visual reminder alert */
+    .reminder-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(90, 50, 65, 0.45);
+      backdrop-filter: blur(8px);
+      z-index: 400;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .reminder-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .reminder-card {
+      background: rgba(255, 248, 250, 0.96);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 24px;
+      padding: 28px 24px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(140, 80, 100, 0.3);
+      transform: scale(0.9) translateY(20px);
+      transition: transform 0.35s ease;
+      animation: remPulse 1.2s ease-in-out infinite;
+    }
+    .reminder-overlay.show .reminder-card {
+      transform: scale(1) translateY(0);
+    }
+    @keyframes remPulse {
+      0%, 100% { box-shadow: 0 24px 60px rgba(140, 80, 100, 0.3), 0 0 0 0 rgba(224, 154, 170, 0.45); }
+      50% { box-shadow: 0 24px 60px rgba(140, 80, 100, 0.35), 0 0 0 14px rgba(224, 154, 170, 0); }
+    }
+    .reminder-card .rc-bell {
+      font-size: 3rem;
+      margin-bottom: 12px;
+      display: inline-block;
+      animation: remShake 0.55s ease-in-out 3;
+    }
+    @keyframes remShake {
+      0%, 100% { transform: rotate(0); }
+      25% { transform: rotate(-14deg); }
+      75% { transform: rotate(14deg); }
+    }
+    .reminder-card .rc-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-deep);
+      margin-bottom: 8px;
+    }
+    .reminder-card .rc-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+    .reminder-card .rc-sub {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 22px;
+    }
+    .reminder-card .rc-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .reminder-card .rc-actions .btn { flex: 1; min-height: 48px; }
+
+    .modal {
+      background: rgba(255, 250, 252, 0.88);
+      backdrop-filter: blur(28px) saturate(1.4);
+      -webkit-backdrop-filter: blur(28px) saturate(1.4);
+      border-radius: 24px 24px 0 0;
+      padding: 24px 18px calc(24px + var(--safe-bottom));
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 -8px 40px rgba(140, 80, 100, 0.18);
+      border: 1px solid rgba(255,255,255,0.7);
+      border-bottom: none;
+      max-height: 92vh;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease;
+    }
+    @media (min-width: 520px) {
+      .modal {
+        border-radius: 26px;
+        padding: 28px;
+        border-bottom: 1px solid rgba(255,255,255,0.7);
+        animation: fadeIn 0.25s ease;
+      }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal h2 {
+      margin-bottom: 16px;
+      font-size: 1.2rem;
+      color: var(--text);
+    }
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-bottom: 5px;
+      color: var(--muted);
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      justify-content: flex-end;
+    }
+    .modal-actions .btn { flex: 1; }
+    @media (min-width: 520px) {
+      .modal-actions .btn { flex: none; }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 36px 16px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .reminder-badge {
+      display: inline-block;
+      background: rgba(224, 154, 170, 0.28);
+      color: var(--accent-deep);
+      font-size: 0.68rem;
+      padding: 2px 7px;
+      border-radius: 20px;
+      margin-left: 4px;
+    }
+    .upcoming { max-height: 240px; overflow-y: auto; }
+    .upcoming-item {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(200, 120, 140, 0.1);
+      font-size: 0.88rem;
+      cursor: pointer;
+    }
+    .upcoming-item:last-child { border-bottom: none; }
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0 12px;
+    }
+    .filter-chip {
+      border: 1px solid rgba(200, 120, 140, 0.25);
+      background: rgba(255,255,255,0.4);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 32px;
+      font-family: inherit;
+    }
+    .filter-chip.active {
+      background: linear-gradient(135deg, #e09aaa, #d08098);
+      color: #fff;
+      border-color: transparent;
+    }
+    .backup-panel { padding: 4px 0; }
+    .backup-intro {
+      font-size: 0.92rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .backup-hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 8px;
+      min-height: 1.2em;
+    }
+
+    .main-views.hidden { display: none; }
+
+    /* ===== MOBILE BOTTOM NAV + FAB ===== */
+    .fab {
+      position: fixed;
+      bottom: calc(72px + var(--safe-bottom));
+      right: 16px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #e09aaa, #d08098);
+      color: #fff;
+      border: none;
+      font-size: 1.6rem;
+      box-shadow: 0 6px 24px rgba(200, 120, 140, 0.45);
+      cursor: pointer;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s;
+    }
+    .fab:active { transform: scale(0.92); }
+
+    .mobile-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255, 248, 250, 0.85);
+      backdrop-filter: blur(24px) saturate(1.5);
+      -webkit-backdrop-filter: blur(24px) saturate(1.5);
+      border-top: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 8px calc(8px + var(--safe-bottom));
+      z-index: 40;
+      box-shadow: 0 -4px 24px rgba(160, 90, 110, 0.1);
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 6px 14px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 12px;
+      transition: all 0.2s;
+      min-width: 64px;
+    }
+    .nav-item .icon { font-size: 1.25rem; line-height: 1; }
+    .nav-item.active {
+      color: var(--accent-deep);
+      background: rgba(224, 154, 170, 0.15);
+    }
+
+    /* Hide desktop sidebar buttons on mobile */
+    .desktop-only { display: none; }
+    @media (min-width: 820px) {
+      .desktop-only { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="hearts" id="hearts"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <div class="app">
+    <header>
+      <h1>🍀 Diár</h1>
+      <div class="weather-chip" id="weatherChip" onclick="refreshWeather()" title="Počasie">
+        <span class="weather-icon" id="weatherIcon">…</span>
+        <span class="weather-temp" id="weatherTemp"></span>
+        <span class="weather-place" id="weatherPlace"></span>
+      </div>
+    </header>
+
+    <!-- Mobile category chips -->
+    <div class="categories-mobile" id="mobileCats"></div>
+
+    <!-- ===== MAIN VIEWS ===== -->
+    <div class="main main-views" id="mainViews">
+      <div class="sidebar sidebar-desktop">
+        <div class="card">
+          <h3 data-i18n="categories">Categories</h3>
+          <div class="category-list" id="categoryList"></div>
+          <button class="btn btn-secondary" style="width:100%;margin-top:10px" onclick="openCategoryModal()" data-i18n="addCategory">
+            + Add category
+          </button>
+        </div>
+        <div class="card">
+          <h3 data-i18n="upcoming">Upcoming reminders</h3>
+          <div class="filter-chips" id="reminderFilters">
+            <button type="button" class="filter-chip active" data-filter="all" onclick="setReminderFilter('all')">All</button>
+            <button type="button" class="filter-chip" data-filter="today" onclick="setReminderFilter('today')">Today</button>
+            <button type="button" class="filter-chip" data-filter="week" onclick="setReminderFilter('week')">Week</button>
+            <button type="button" class="filter-chip" data-filter="later" onclick="setReminderFilter('later')">Later</button>
+          </div>
+          <div class="filter-chips" id="reminderCatFilters"></div>
+          <div class="upcoming" id="upcomingList">
+            <div class="empty-state" style="padding:12px">No reminders</div>
+          </div>
+        </div>
+        <button class="btn btn-primary desktop-only" style="width:100%" onclick="openTaskModal()" data-i18n="newTask">
+          + New task
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="calendar-header">
+          <h2 id="periodTitle">September 2026</h2>
+          <div class="nav-btns">
+            <button class="btn btn-ghost" onclick="changePeriod(-1)">◀</button>
+            <button class="btn btn-ghost" onclick="goToday()" data-i18n="today">Today</button>
+            <button class="btn btn-ghost" onclick="changePeriod(1)">▶</button>
+          </div>
+        </div>
+        <div id="monthView">
+          <div class="calendar-grid" id="calendarGrid"></div>
+          <div class="day-detail" id="dayDetail" style="display:none">
+            <div class="day-detail-header">
+              <div>
+                <div class="day-detail-title" id="dayDetailTitle">Deň</div>
+                <div class="day-detail-meniny" id="dayDetailMeniny"></div>
+              </div>
+              <button class="btn btn-ghost" onclick="closeDayDetail()" style="min-width:auto;padding:8px 12px">✕</button>
+            </div>
+            <div class="task-list" id="dayDetailTasks"></div>
+            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="openTaskModal(state.selectedDate)" data-i18n="addTaskDay">+ Add task for this day</button>
+          </div>
+        </div>
+        <div id="weekView" style="display:none">
+          <div class="week-grid" id="weekGrid"></div>
+        </div>
+        <div id="listView" style="display:none">
+          <div class="backup-panel">
+            <p class="backup-intro" data-i18n="backupIntro">Export all tasks and reminders to Excel (CSV). Import them again on another phone.</p>
+            <button type="button" class="btn btn-primary" style="width:100%;margin-bottom:12px" onclick="exportToExcel()" data-i18n="exportExcel">
+              📤 Export to Excel
+            </button>
+            <label class="btn btn-secondary" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;cursor:pointer" data-i18n="importExcel">
+              📥 Import from Excel
+              <input type="file" id="importFile" accept=".csv,.txt,text/csv" style="display:none" onchange="importFromExcel(event)">
+            </label>
+            <p class="backup-hint" id="backupStatus"></p>
+          </div>
+        </div>
+        <div id="notesView" style="display:none">
+          <div class="notes-toolbar">
+            <button class="btn btn-primary" onclick="addNoteBlock()" data-i18n="newBlock">+ New block</button>
+            <span class="notes-meta" id="notesMeta" data-i18n="saved">Saved</span>
+          </div>
+          <div id="notesBlocks"></div>
+        </div>
+        <div id="settingsView" style="display:none">
+          <div class="card" style="margin-bottom:12px">
+            <h3 data-i18n="theme" style="margin-bottom:12px">Theme</h3>
+            <div class="theme-dots" id="themeDots"></div>
+            <p style="margin-top:12px;font-size:0.85rem;color:var(--muted)" data-i18n="themeHint">Pick a pastel look. Floating symbols change with the color.</p>
+          </div>
+          <div class="card">
+            <h3 data-i18n="language" style="margin-bottom:12px">Language</h3>
+            <div class="lang-switch">
+              <button type="button" class="lang-btn active" id="langSk" onclick="setLang('sk')">SK</button>
+              <button type="button" class="lang-btn" id="langEn" onclick="setLang('en')">EN</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CATEGORY DETAIL PAGE ===== -->
+    <div class="category-page" id="categoryPage">
+      <button class="btn btn-back" onclick="closeCategoryPage()">← Späť</button>
+      <div class="card">
+        <div class="category-page-header">
+          <div>
+            <div class="category-page-title">
+              <span class="category-page-dot" id="catPageDot"></span>
+              <span id="catPageName">Kategória</span>
+            </div>
+            <div class="category-stats" id="catPageStats"></div>
+          </div>
+        </div>
+        <div style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-primary" style="width:100%" onclick="openTaskModalForCategory()">+ Pridať úlohu</button>
+          <button class="btn btn-secondary" style="width:100%;color:#c06070;border-color:rgba(200,100,120,0.25)" onclick="deleteCategoryFromPage()">🗑 Zmazať kategóriu</button>
+        </div>
+        <div class="task-list" id="catPageTasks"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB (mobile) -->
+  <button class="fab" id="fab" onclick="openTaskModal()" title="Nová úloha">+</button>
+
+  <!-- Mobile bottom nav -->
+  <nav class="mobile-nav" id="mobileNav">
+    <button class="nav-item active" data-view="month" onclick="setView('month')">
+      <span class="icon">📅</span>
+      <span>Month</span>
+    </button>
+    <button class="nav-item" data-view="week" onclick="setView('week')">
+      <span class="icon">🗓️</span>
+      <span>Week</span>
+    </button>
+    <button class="nav-item" data-view="list" onclick="setView('list')">
+      <span class="icon">💾</span>
+      <span>Backup</span>
+    </button>
+    <button class="nav-item" data-view="notes" onclick="setView('notes')">
+      <span class="icon">📝</span>
+      <span>Notes</span>
+    </button>
+    <button class="nav-item" data-view="settings" onclick="setView('settings')">
+      <span class="icon">⚙️</span>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+  <!-- Task Modal -->
+  <div class="modal-overlay" id="taskModal">
+    <div class="modal">
+      <h2 id="taskModalTitle">New task</h2>
+      <form id="taskForm">
+        <input type="hidden" id="taskId">
+        <div class="form-group">
+          <label data-i18n="taskName">Task name</label>
+          <input type="text" id="taskTitle" required data-i18n-placeholder="placeholderTask" placeholder="e.g. Workout, Meeting...">
+        </div>
+        <div class="form-group">
+          <label data-i18n="taskDesc">Description (optional)</label>
+          <textarea id="taskDesc" rows="2" data-i18n-placeholder="placeholderDesc" placeholder="Details..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="date">Date</label>
+            <input type="date" id="taskDate" required>
+          </div>
+          <div class="form-group">
+            <label data-i18n="time">Time</label>
+            <input type="time" id="taskTime">
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="category">Category</label>
+          <select id="taskCategory" required></select>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:44px">
+            <input type="checkbox" id="taskReminder" style="width:20px;height:20px"> <span data-i18n="setReminder">Set reminder</span>
+          </label>
+        </div>
+        <div class="form-group" id="reminderTimeGroup" style="display:none">
+          <label data-i18n="remindAt">Remind at</label>
+          <input type="datetime-local" id="reminderTime">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" onclick="closeTaskModal()" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-i18n="save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Category Modal -->
+  <div class="modal-overlay" id="categoryModal">
+    <div class="modal">
+      <h2 data-i18n="newCategory">New category</h2>
+      <form id="categoryForm">
+        <div class="form-group">
+          <label data-i18n="catName">Name</label>
+          <input type="text" id="catName" required data-i18n-placeholder="placeholderCat" placeholder="e.g. Work, Personal, Sport...">
+        </div>
+        <div class="form-group">
+          <label data-i18n="color">Color</label>
+          <div class="color-picker" id="colorPicker"></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" onclick="closeCategoryModal()" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-i18n="add">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal" style="text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:12px" id="confirmIcon">⚠️</div>
+      <h2 id="confirmTitle" style="margin-bottom:8px" data-i18n="confirm">Confirm</h2>
+      <p id="confirmMessage" style="color:var(--muted);font-size:0.95rem;margin-bottom:22px;line-height:1.45"></p>
+      <div class="modal-actions" style="justify-content:center">
+        <button type="button" class="btn btn-ghost" onclick="closeConfirmModal()" data-i18n="cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmOkBtn" style="background:linear-gradient(135deg,#e08090,#c06070)" data-i18n="delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visual reminder alert -->
+  <div class="reminder-overlay" id="reminderOverlay" onclick="if(event.target===this)hideReminderAlert()">
+    <div class="reminder-card">
+      <div class="rc-bell">🔔</div>
+      <div class="rc-label">Pripomienka</div>
+      <div class="rc-title" id="rcTitle">Úloha</div>
+      <div class="rc-sub" id="rcSub">Čas tvojej úlohy práve nastal</div>
+      <div class="rc-actions">
+        <button type="button" class="btn btn-ghost" onclick="hideReminderAlert()">Zavrieť</button>
+        <button type="button" class="btn btn-primary" id="rcDoneBtn">Hotovo</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PASTEL_COLORS = [
+      '#e09aaa', '#a8c8e0', '#b8d8c8', '#e8c8b0', '#c8b0d8',
+      '#d8b8c8', '#b0c8d8', '#e0d0b8', '#c8b8d0', '#e8b8c8'
+    ];
+
+    const THEMES = {
+      rose: {
+        accent: '#e09aaa', accentDeep: '#c97a8c', text: '#5c3d48', muted: '#a07a88',
+        bg: 'linear-gradient(160deg, #fdf4f7 0%, #f5e6ec 45%, #ebe0f0 100%)',
+        blobs: ['#f0b8c8', '#d8b8e8', '#e8c8d8'],
+        floatColor: 'rgba(224, 154, 170, 0.28)',
+        symbols: ['♥', '♡', '❤', '💕'],
+        themeColor: '#e09aaa'
+      },
+      mint: {
+        accent: '#8ecf9a', accentDeep: '#6ab080', text: '#3d5c48', muted: '#7a9a88',
+        bg: 'linear-gradient(160deg, #f4fdf7 0%, #e6f5ec 45%, #e0ebe8 100%)',
+        blobs: ['#b8e0c0', '#c8e8d8', '#d0f0e0'],
+        floatColor: 'rgba(110, 180, 120, 0.28)',
+        symbols: ['🍀', '☘', '🌿', '🍃'],
+        themeColor: '#8ecf9a'
+      },
+      sky: {
+        accent: '#8eb8e0', accentDeep: '#6a98c0', text: '#3d4c5c', muted: '#7a8a9a',
+        bg: 'linear-gradient(160deg, #f4f8fd 0%, #e6eef5 45%, #e0e8eb 100%)',
+        blobs: ['#b8d0e8', '#c8d8f0', '#d0e0f0'],
+        floatColor: 'rgba(120, 170, 210, 0.28)',
+        symbols: ['☁', '🌤', '✦', '✧'],
+        themeColor: '#8eb8e0'
+      },
+      lavender: {
+        accent: '#b8a0d0', accentDeep: '#9478b0', text: '#4a3d5c', muted: '#8a7a9a',
+        bg: 'linear-gradient(160deg, #f8f4fd 0%, #eee6f5 45%, #e8e0eb 100%)',
+        blobs: ['#d0b8e8', '#e0c8f0', '#d8c0e8'],
+        floatColor: 'rgba(160, 130, 200, 0.28)',
+        symbols: ['✦', '✧', '⋆', '✶'],
+        themeColor: '#b8a0d0'
+      },
+      peach: {
+        accent: '#e8b890', accentDeep: '#d09870', text: '#5c4a3d', muted: '#9a8a7a',
+        bg: 'linear-gradient(160deg, #fdf8f4 0%, #f5eee6 45%, #ebe4e0 100%)',
+        blobs: ['#f0d0b8', '#e8c8a8', '#f0dcc8'],
+        floatColor: 'rgba(220, 160, 120, 0.28)',
+        symbols: ['✿', '❀', '❁', '✾'],
+        themeColor: '#e8b890'
+      },
+      gray: {
+        accent: '#a8b0b8', accentDeep: '#788088', text: '#3d4448', muted: '#7a8288',
+        bg: 'linear-gradient(160deg, #f6f7f8 0%, #eceef0 45%, #e4e6e8 100%)',
+        blobs: ['#d0d4d8', '#c8ccd0', '#d8dce0'],
+        floatColor: 'rgba(140, 150, 160, 0.28)',
+        symbols: ['●', '○', '◉', '◎'],
+        themeColor: '#a8b0b8'
+      }
+    };
+
+    const I18N = {
+      sk: {
+        theme: 'Téma', language: 'Jazyk', settings: 'Nastavenia',
+        themeHint: 'Vyber pastelový vzhľad. Plávajúce symboly sa menia podľa farby.',
+        month: 'Mesiac', week: 'Týždeň', backup: 'Záloha', notes: 'Poznámky',
+        categories: 'Kategórie', addCategory: '+ Pridať kategóriu',
+        upcoming: 'Nadchádzajúce pripomienky',
+        filterAll: 'Všetky', filterToday: 'Dnes', filterWeek: 'Týždeň', filterLater: 'Neskôr',
+        newTask: '+ Nová úloha', addTaskDay: '+ Pridať úlohu na tento deň',
+        backupIntro: 'Exportuj všetky úlohy a pripomienky do Excelu (CSV). Na inom mobile ich znova naimportuj.',
+        exportExcel: '📤 Export do Excelu', importExcel: '📥 Import z Excelu',
+        newBlock: '+ Nový blok', saved: 'Uložené',
+        back: '← Späť', addTask: '+ Pridať úlohu', deleteCategory: '🗑 Zmazať kategóriu',
+        taskNew: 'Nová úloha', taskEdit: 'Upraviť úlohu',
+        taskName: 'Názov úlohy', taskDesc: 'Popis (voliteľné)',
+        date: 'Dátum', time: 'Čas', category: 'Kategória',
+        setReminder: 'Nastaviť pripomienku', remindAt: 'Pripomenúť o',
+        cancel: 'Zrušiť', save: 'Uložiť', add: 'Pridať',
+        newCategory: 'Nová kategória', catName: 'Názov', color: 'Farba',
+        confirm: 'Potvrdenie', delete: 'Vymazať',
+        reminder: 'Pripomienka', close: 'Zavrieť', done: 'Hotovo',
+        reminderSub: 'Čas tvojej úlohy práve nastal',
+        noReminders: 'Žiadne pripomienky v tomto filtri',
+        noTasksDay: 'Na tento deň zatiaľ nemáš žiadne úlohy ani pripomienky.',
+        nameDay: 'Meniny',
+        today: 'Dnes',
+        work: 'Práca', personal: 'Osobné', health: 'Zdravie',
+        generalNotes: 'Všeobecné', newNoteBlock: 'Nový blok',
+        placeholderTask: 'Napr. Cvičenie, Stretnutie...',
+        placeholderDesc: 'Detaily...',
+        placeholderCat: 'Napr. Práca, Osobné, Šport...',
+        placeholderNote: 'Píš sem...',
+        placeholderNoteTitle: 'Názov bloku'
+      },
+      en: {
+        theme: 'Theme', language: 'Language', settings: 'Settings',
+        themeHint: 'Pick a pastel look. Floating symbols change with the color.',
+        month: 'Month', week: 'Week', backup: 'Backup', notes: 'Notes',
+        categories: 'Categories', addCategory: '+ Add category',
+        upcoming: 'Upcoming reminders',
+        filterAll: 'All', filterToday: 'Today', filterWeek: 'Week', filterLater: 'Later',
+        newTask: '+ New task', addTaskDay: '+ Add task for this day',
+        backupIntro: 'Export all tasks and reminders to Excel (CSV). Import them again on another phone.',
+        exportExcel: '📤 Export to Excel', importExcel: '📥 Import from Excel',
+        newBlock: '+ New block', saved: 'Saved',
+        back: '← Back', addTask: '+ Add task', deleteCategory: '🗑 Delete category',
+        taskNew: 'New task', taskEdit: 'Edit task',
+        taskName: 'Task name', taskDesc: 'Description (optional)',
+        date: 'Date', time: 'Time', category: 'Category',
+        setReminder: 'Set reminder', remindAt: 'Remind at',
+        cancel: 'Cancel', save: 'Save', add: 'Add',
+        newCategory: 'New category', catName: 'Name', color: 'Color',
+        confirm: 'Confirm', delete: 'Delete',
+        reminder: 'Reminder', close: 'Close', done: 'Done',
+        reminderSub: 'Your task time has arrived',
+        noReminders: 'No reminders in this filter',
+        noTasksDay: 'No tasks or reminders for this day yet.',
+        nameDay: 'Name day',
+        today: 'Today',
+        work: 'Work', personal: 'Personal', health: 'Health',
+        generalNotes: 'General', newNoteBlock: 'New block',
+        placeholderTask: 'e.g. Workout, Meeting...',
+        placeholderDesc: 'Details...',
+        placeholderCat: 'e.g. Work, Personal, Sport...',
+        placeholderNote: 'Write here...',
+        placeholderNoteTitle: 'Block title'
+      }
+    };
+
+    let state = {
+      categories: [],
+      tasks: [],
+      notes: [],
+      currentView: 'month',
+      currentDate: new Date(),
+      selectedDate: null,
+      selectedColor: PASTEL_COLORS[0],
+      openCategoryId: null,
+      reminderFilter: 'all',
+      reminderCatFilter: null,
+      theme: 'rose',
+      lang: 'sk'
+    };
+
+    function t(key) {
+      const pack = I18N[state.lang] || I18N.sk;
+      return pack[key] || I18N.sk[key] || key;
+    }
+
+    function applyI18n() {
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (!key || !t(key)) return;
+        if (el.children.length) {
+          const textNode = [...el.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+          if (textNode) textNode.textContent = t(key) + ' ';
+          else el.insertBefore(document.createTextNode(t(key) + ' '), el.firstChild);
+        } else {
+          el.textContent = t(key);
+        }
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (key && t(key)) el.placeholder = t(key);
+      });
+      // Bottom nav labels
+      document.querySelectorAll('.nav-item[data-view="month"] span:last-child').forEach(el => { el.textContent = t('month'); });
+      document.querySelectorAll('.nav-item[data-view="week"] span:last-child').forEach(el => { el.textContent = t('week'); });
+      document.querySelectorAll('.nav-item[data-view="list"] span:last-child').forEach(el => { el.textContent = t('backup'); });
+      document.querySelectorAll('.nav-item[data-view="notes"] span:last-child').forEach(el => { el.textContent = t('notes'); });
+      document.querySelectorAll('.nav-item[data-view="settings"] span:last-child').forEach(el => { el.textContent = t('settings'); });
+      // Filters
+      const fr = document.getElementById('reminderFilters');
+      if (fr) {
+        const map = { all: 'filterAll', today: 'filterToday', week: 'filterWeek', later: 'filterLater' };
+        fr.querySelectorAll('.filter-chip').forEach(btn => {
+          const k = map[btn.dataset.filter];
+          if (k) btn.textContent = t(k);
+        });
+      }
+      document.getElementById('langSk')?.classList.toggle('active', state.lang === 'sk');
+      document.getElementById('langEn')?.classList.toggle('active', state.lang === 'en');
+      document.documentElement.lang = state.lang;
+    }
+
+    function setLang(lang) {
+      state.lang = lang === 'en' ? 'en' : 'sk';
+      localStorage.setItem('zlatkoDiary_lang', state.lang);
+      applyI18n();
+      render();
+    }
+
+    function spawnSymbols() {
+      const container = document.getElementById('hearts');
+      if (!container) return;
+      container.innerHTML = '';
+      const theme = THEMES[state.theme] || THEMES.rose;
+      const symbols = theme.symbols;
+      for (let i = 0; i < 18; i++) {
+        const el = document.createElement('span');
+        el.className = 'heart' + (i % 3 === 0 ? ' soft' : '') + (i % 4 === 0 ? ' big' : '') + (i % 5 === 0 ? ' tiny' : '');
+        el.textContent = symbols[i % symbols.length];
+        el.style.left = Math.random() * 100 + '%';
+        el.style.bottom = '-' + (Math.random() * 20) + '%';
+        el.style.animationDuration = (12 + Math.random() * 16) + 's';
+        el.style.animationDelay = (Math.random() * 14) + 's';
+        container.appendChild(el);
+      }
+    }
+
+    function applyTheme(themeId) {
+      if (!THEMES[themeId]) themeId = 'rose';
+      state.theme = themeId;
+      localStorage.setItem('zlatkoDiary_theme', themeId);
+      const th = THEMES[themeId];
+      const root = document.documentElement;
+      root.style.setProperty('--accent', th.accent);
+      root.style.setProperty('--accent-deep', th.accentDeep);
+      root.style.setProperty('--text', th.text);
+      root.style.setProperty('--muted', th.muted);
+      root.style.setProperty('--bg-gradient', th.bg);
+      root.style.setProperty('--float-color', th.floatColor);
+      root.style.setProperty('--shadow', `0 10px 40px ${th.accent}33`);
+      document.body.style.background = th.bg;
+      const blobs = document.querySelectorAll('.blob');
+      if (blobs[0]) blobs[0].style.background = th.blobs[0];
+      if (blobs[1]) blobs[1].style.background = th.blobs[1];
+      if (blobs[2]) blobs[2].style.background = th.blobs[2];
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = th.themeColor;
+      document.querySelectorAll('.theme-dot').forEach(d => {
+        d.classList.toggle('active', d.dataset.theme === themeId);
+      });
+      spawnSymbols();
+    }
+
+    function renderThemeDots() {
+      const wrap = document.getElementById('themeDots');
+      if (!wrap) return;
+      wrap.innerHTML = Object.keys(THEMES).map(id => {
+        const th = THEMES[id];
+        return `<button type="button" class="theme-dot ${state.theme === id ? 'active' : ''}" data-theme="${id}"
+          style="background:${th.accent}" title="${id}" onclick="applyTheme('${id}')"></button>`;
+      }).join('');
+    }
+
+    // Slovenské meniny (bežné mená podľa dňa MM-DD)
+    const MENINY = {
+      '01-01':'Nový rok','01-02':'Alexandra, Karina','01-03':'Daniela','01-04':'Drahoslav','01-05':'Andrea','01-06':'Antónia','01-07':'Bohuslava','01-08':'Severín','01-09':'Alexej','01-10':'Dáša','01-11':'Malvína','01-12':'Ernest','01-13':'Rastislav','01-14':'Radovan','01-15':'Dobroslav','01-16':'Kristína','01-17':'Nataša','01-18':'Bohdana','01-19':'Drahomíra','01-20':'Dalibor','01-21':'Vincent','01-22':'Zora','01-23':'Miloš','01-24':'Timotej','01-25':'Gejza','01-26':'Tamara','01-27':'Bohuš','01-28':'Alfonz','01-29':'Gašpar','01-30':'Ema','01-31':'Emil',
+      '02-01':'Tatiana','02-02':'Erika, Miroslav','02-03':'Blažej','02-04':'Veronika','02-05':'Agáta','02-06':'Dorota','02-07':'Vanda','02-08':'Zoja','02-09':'Zdenko','02-10':'Gabriela','02-11':'Dezider','02-12':'Perla','02-13':'Arpád','02-14':'Valentín','02-15':'Pravoslav','02-16':'Ida','02-17':'Miloslava','02-18':'Jaromír','02-19':'Vlasta','02-20':'Lívia','02-21':'Eleonóra','02-22':'Etela','02-23':'Roman, Romana','02-24':'Matej','02-25':'Frederik','02-26':'Viktor','02-27':'Alexander','02-28':'Radomír',
+      '03-01':'Albín','03-02':'Anežka','03-03':'Bohumil, Bohumila','03-04':'Kazimír','03-05':'Fridrich','03-06':'Radoslav','03-07':'Tomáš','03-08':'Alan, Alana','03-09':'Františka','03-10':'Bruno','03-11':'Angela, Marian','03-12':'Gregor','03-13':'Vlastimil','03-14':'Matilda','03-15':'Svetlana','03-16':'Boleslav','03-17':'Ľubica','03-18':'Eduard','03-19':'Jozef','03-20':'Víťazoslav','03-21':'Blahoslav','03-22':'Beňadik','03-23':'Adrián','03-24':'Gabriel','03-25':'Marián','03-26':'Emanuel','03-27':'Alena','03-28':'Soňa','03-29':'Miroslav','03-30':'Vieroslava','03-31':'Benjamín',
+      '04-01':'Hugo','04-02':'Zita','04-03':'Richard','04-04':'Izidor','04-05':'Miroslava','04-06':'Irena','04-07':'Zoltán','04-08':'Albert','04-09':'Milena','04-10':'Igor','04-11':'Július','04-12':'Estera','04-13':'Aleš','04-14':'Justína','04-15':'Fedor','04-16':'Dana, Danica','04-17':'Rudolf','04-18':'Valér','04-19':'Jela','04-20':'Marcel','04-21':'Ervín','04-22':'Slavomír','04-23':'Vojtech','04-24':'Juraj','04-25':'Marek','04-26':'Jaroslava','04-27':'Jaroslav','04-28':'Jarmila','04-29':'Lea','04-30':'Anastázia',
+      '05-01':'Sviatok práce','05-02':'Žigmund','05-03':'Galina','05-04':'Florián','05-05':'Lesana, Lesia','05-06':'Hermína','05-07':'Monika','05-08':'Ingrida','05-09':'Roland','05-10':'Viktória','05-11':'Blažena','05-12':'Pankrác','05-13':'Servác','05-14':'Bonifác','05-15':'Žofia','05-16':'Svetozár','05-17':'Gizela','05-18':'Viola','05-19':'Gertrúda','05-20':'Bernard','05-21':'Zina','05-22':'Júlia, Juliana','05-23':'Želmíra','05-24':'Ela','05-25':'Urban','05-26':'Dušan','05-27':'Iveta','05-28':'Viliam','05-29':'Vilma','05-30':'Ferdinand','05-31':'Petronela',
+      '06-01':'Žaneta','06-02':'Oxana, Xénia','06-03':'Karolína','06-04':'Lenka','06-05':'Laura','06-06':'Norbert','06-07':'Róbert','06-08':'Medard','06-09':'Stanislava','06-10':'Margaréta','06-11':'Dobroslava','06-12':'Zlatko','06-13':'Anton','06-14':'Vasil','06-15':'Vít','06-16':'Blanka','06-17':'Adolf','06-18':'Vratislav','06-19':'Alfréd','06-20':'Valéria','06-21':'Alojz','06-22':'Paulína','06-23':'Sidónia','06-24':'Ján','06-25':'Tadeáš','06-26':'Olívia','06-27':'Ladislav','06-28':'Beáta','06-29':'Peter, Pavol','06-30':'Melánia',
+      '07-01':'Diana','07-02':'Berta','07-03':'Miloslav','07-04':'Prokop','07-05':'Cyril, Metod','07-06':'Patrik, Patricia','07-07':'Oliver','07-08':'Ivan','07-09':'Lujza','07-10':'Amália','07-11':'Milota','07-12':'Nina','07-13':'Margita','07-14':'Kamil','07-15':'Henrich','07-16':'Drahomír','07-17':'Bohuslav','07-18':'Kamila','07-19':'Dušana','07-20':'Iľja, Eliáš','07-21':'Daniel','07-22':'Magdaléna','07-23':'Oľga','07-24':'Vladimír','07-25':'Jakub','07-26':'Anna, Hana','07-27':'Božena','07-28':'Krištof','07-29':'Marta','07-30':'Libuša','07-31':'Ignác',
+      '08-01':'Božidara','08-02':'Gustáv','08-03':'Jerguš','08-04':'Dominik, Dominika','08-05':'Hortenzia','08-06':'Jozefína','08-07':'Štefánia','08-08':'Oskar','08-09':'Ľubomíra','08-10':'Vavrinec','08-11':'Zuzana','08-12':'Darina','08-13':'Ľubomír','08-14':'Mojmír','08-15':'Marcela','08-16':'Leonard','08-17':'Milica','08-18':'Elena, Helena','08-19':'Lýdia','08-20':'Anabela','08-21':'Jana','08-22':'Tichomír','08-23':'Filip','08-24':'Bartolomej','08-25':'Ľudovít','08-26':'Samuel','08-27':'Silvia','08-28':'Augustín','08-29':'Nikola, Nikolaj','08-30':'Ružena','08-31':'Nora',
+      '09-01':'Drahoslava','09-02':'Linda','09-03':'Belo','09-04':'Rozália','09-05':'Regína','09-06':'Alica','09-07':'Marianna','09-08':'Miriama','09-09':'Martina','09-10':'Oleg','09-11':'Bystrík','09-12':'Mária','09-13':'Ctibor','09-14':'Ľudomil','09-15':'Jolana','09-16':'Ľudmila','09-17':'Olympia','09-18':'Eugénia','09-19':'Konštantín','09-20':'Ľuboslav, Ľuboslava','09-21':'Matúš','09-22':'Móric','09-23':'Zdenka','09-24':'Ľuboš, Ľubor','09-25':'Vladislav','09-26':'Edita','09-27':'Cyprián','09-28':'Václav','09-29':'Michal, Michaela','09-30':'Jarolím',
+      '10-01':'Arnold','10-02':'Levoslav','10-03':'Stela','10-04':'František','10-05':'Viera','10-06':'Natália','10-07':'Eliška','10-08':'Brigita','10-09':'Dionýz','10-10':'Slavomíra','10-11':'Valentína','10-12':'Maximilián','10-13':'Koloman','10-14':'Boris','10-15':'Terézia','10-16':'Vladimíra','10-17':'Hedviga','10-18':'Lukáš','10-19':'Kristián','10-20':'Vendelín','10-21':'Uršula','10-22':'Sergej','10-23':'Alojzia','10-24':'Kvetoslava','10-25':'Aurel','10-26':'Demeter','10-27':'Sabína','10-28':'Dobromila','10-29':'Klára','10-30':'Šimon, Simona','10-31':'Irena, René',
+      '11-01':'Denis, Denisa','11-02':'Dušičky','11-03':'Hubert','11-04':'Karol','11-05':'Imrich','11-06':'Renáta','11-07':'René','11-08':'Bohumír','11-09':'Teodor','11-10':'Tibor','11-11':'Martin, Maroš','11-12':'Svätopluk','11-13':'Stanislav','11-14':'Irma','11-15':'Leopold','11-16':'Agnesa','11-17':'Klaudia','11-18':'Eugen','11-19':'Alžbeta','11-20':'Félix','11-21':'Elvíra','11-22':'Cecília','11-23':'Klement','11-24':'Emília','11-25':'Katarína','11-26':'Kornel','11-27':'Milan','11-28':'Henrieta','11-29':'Vratko','11-30':'Ondrej, Andrej',
+      '12-01':'Edmund','12-02':'Bibiána','12-03':'Oldrich','12-04':'Barbora','12-05':'Oto','12-06':'Mikuláš','12-07':'Ambróz','12-08':'Marína','12-09':'Izabela','12-10':'Radúz','12-11':'Hilda','12-12':'Otília','12-13':'Lucia','12-14':'Branislav, Bronislava','12-15':'Ivica','12-16':'Albína','12-17':'Kornélia','12-18':'Sláva','12-19':'Judita','12-20':'Dagmara','12-21':'Bohdan','12-22':'Adela','12-23':'Nadežda','12-24':'Adam, Eva','12-25':'1. sviatok vianočný','12-26':'Štefan','12-27':'Filoména','12-28':'Ivana, Ivona','12-29':'Milada','12-30':'Dávid','12-31':'Silvester'
+    };
+    function getMeniny(dateStr) {
+      const key = dateStr.slice(5); // MM-DD
+      return MENINY[key] || '';
+    }
+
+    function loadData() {
+      state.theme = localStorage.getItem('zlatkoDiary_theme') || 'rose';
+      state.lang = localStorage.getItem('zlatkoDiary_lang') || 'sk';
+      const cats = localStorage.getItem('zlatkoDiary_cats');
+      const tasks = localStorage.getItem('zlatkoDiary_tasks');
+      state.categories = cats ? JSON.parse(cats) : [
+        { id: '1', name: t('work'), color: '#a8c8e0' },
+        { id: '2', name: t('personal'), color: '#e09aaa' },
+        { id: '3', name: t('health'), color: '#b8d8c8' }
+      ];
+      state.tasks = tasks ? JSON.parse(tasks) : [];
+      // Notes: migrate old single string → blocks
+      const rawNotes = localStorage.getItem('zlatkoDiary_notes');
+      try {
+        const parsed = rawNotes ? JSON.parse(rawNotes) : null;
+        if (Array.isArray(parsed)) {
+          state.notes = parsed;
+        } else if (typeof rawNotes === 'string' && rawNotes && rawNotes[0] !== '[') {
+          state.notes = [{ id: 'n1', title: 'Poznámky', body: rawNotes }];
+        } else {
+          state.notes = parsed && parsed.length ? parsed : [{ id: 'n1', title: 'Všeobecné', body: '' }];
+        }
+      } catch {
+        state.notes = rawNotes
+          ? [{ id: 'n1', title: 'Poznámky', body: rawNotes }]
+          : [{ id: 'n1', title: 'Všeobecné', body: '' }];
+      }
+      if (!state.notes.length) state.notes = [{ id: 'n1', title: 'Všeobecné', body: '' }];
+      saveData();
+      saveNotes();
+    }
+    function saveData() {
+      localStorage.setItem('zlatkoDiary_cats', JSON.stringify(state.categories));
+      localStorage.setItem('zlatkoDiary_tasks', JSON.stringify(state.tasks));
+    }
+    function saveNotes() {
+      localStorage.setItem('zlatkoDiary_notes', JSON.stringify(state.notes));
+      const meta = document.getElementById('notesMeta');
+      if (meta) {
+        const now = new Date();
+        meta.textContent = t('saved') + ' ' + now.toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    function renderNotes() {
+      document.getElementById('periodTitle').textContent = t('notes');
+      const wrap = document.getElementById('notesBlocks');
+      if (!wrap) return;
+      wrap.innerHTML = state.notes.map(n => `
+        <div class="note-block" data-id="${n.id}">
+          <div class="note-block-header">
+            <input type="text" value="${(n.title || '').replace(/"/g, '&quot;')}" placeholder="Názov bloku"
+              oninput="updateNoteTitle('${n.id}', this.value)">
+            <button type="button" class="note-block-del" onclick="deleteNoteBlock('${n.id}')" title="Zmazať blok">🗑</button>
+          </div>
+          <textarea placeholder="Píš sem..." oninput="updateNoteBody('${n.id}', this.value)">${(n.body || '').replace(/</g, '&lt;')}</textarea>
+        </div>
+      `).join('');
+    }
+    function addNoteBlock() {
+      state.notes.push({ id: 'n' + Date.now(), title: 'Nový blok', body: '' });
+      saveNotes();
+      renderNotes();
+    }
+    function updateNoteTitle(id, val) {
+      const n = state.notes.find(x => x.id === id);
+      if (n) { n.title = val; saveNotes(); }
+    }
+    function updateNoteBody(id, val) {
+      const n = state.notes.find(x => x.id === id);
+      if (n) { n.body = val; saveNotes(); }
+    }
+    function deleteNoteBlock(id) {
+      if (state.notes.length <= 1) {
+        openConfirmModal('Nemožno zmazať', 'Musí ostať aspoň jeden poznámkový blok.', () => {}, '📝');
+        setTimeout(() => { document.getElementById('confirmOkBtn').textContent = 'Rozumiem'; }, 0);
+        return;
+      }
+      openConfirmModal('Zmazať blok?', 'Poznámky v tomto bloku sa stratia.', () => {
+        state.notes = state.notes.filter(n => n.id !== id);
+        saveNotes();
+        renderNotes();
+      }, '🗑');
+    }
+
+    function formatDate(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    function parseDate(str) {
+      const [y,m,d] = str.split('-').map(Number);
+      return new Date(y, m-1, d);
+    }
+    function loc() { return state.lang === 'en' ? 'en-US' : 'sk-SK'; }
+    function getMonthName(date) {
+      return date.toLocaleDateString(loc(), { month: 'long', year: 'numeric' });
+    }
+    function getWeekRange(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() + diff);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      return { monday, sunday };
+    }
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+    }
+
+    // ===== CATEGORY PAGE =====
+    function openCategoryPage(id) {
+      state.openCategoryId = id;
+      document.getElementById('mainViews').classList.add('hidden');
+      document.getElementById('mobileCats').style.display = 'none';
+      document.getElementById('categoryPage').classList.add('active');
+      document.getElementById('fab').style.display = 'none';
+      renderCategoryPage();
+    }
+    function closeCategoryPage() {
+      state.openCategoryId = null;
+      document.getElementById('mainViews').classList.remove('hidden');
+      document.getElementById('mobileCats').style.display = 'flex';
+      document.getElementById('categoryPage').classList.remove('active');
+      if (state.currentView !== 'settings') document.getElementById('fab').style.display = '';
+      render();
+    }
+    function renderCategoryPage() {
+      const cat = state.categories.find(c => c.id === state.openCategoryId);
+      if (!cat) return;
+      document.getElementById('catPageName').textContent = cat.name;
+      document.getElementById('catPageDot').style.background = cat.color;
+
+      const tasks = state.tasks
+        .filter(t => t.categoryId === cat.id)
+        .sort((a,b) => {
+          if (a.done !== b.done) return a.done ? 1 : -1;
+          return a.date.localeCompare(b.date) || (a.time||'').localeCompare(b.time||'');
+        });
+
+      const doneCount = tasks.filter(t => t.done).length;
+      document.getElementById('catPageStats').textContent =
+        `${tasks.length} úloh · ${doneCount} hotových · ${tasks.length - doneCount} zostáva`;
+
+      const list = document.getElementById('catPageTasks');
+      if (tasks.length === 0) {
+        list.innerHTML = '<div class="empty-state">Zatiaľ žiadne úlohy.<br>Pridaj prvú!</div>';
+        return;
+      }
+      list.innerHTML = tasks.map(t => {
+        const dateObj = parseDate(t.date);
+        const dateLabel = dateObj.toLocaleDateString(loc(), { day:'numeric', month:'short', year:'numeric' });
+        return `
+          <div class="task-item ${t.done ? 'done' : ''}" style="border-color:${cat.color}">
+            <div class="task-check" onclick="toggleDone('${t.id}')">${t.done ? '✓' : ''}</div>
+            <div class="task-content" onclick="editTask('${t.id}')">
+              <div class="task-title">${t.title}
+                ${t.reminder ? '<span class="reminder-badge">🔔</span>' : ''}
+              </div>
+              <div class="task-meta">
+                ${dateLabel}${t.time ? ' · ' + t.time : ''}
+                ${t.desc ? '<br>' + t.desc : ''}
+              </div>
+            </div>
+            <div class="task-actions">
+              <button class="btn btn-ghost" onclick="deleteTask('${t.id}')">🗑</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    function openTaskModalForCategory() {
+      openTaskModal(null, null, state.openCategoryId);
+    }
+
+    // ===== CATEGORIES =====
+    function renderCategories() {
+      // Desktop list
+      const list = document.getElementById('categoryList');
+      list.innerHTML = state.categories.map(c => `
+        <div class="category-item" onclick="openCategoryPage('${c.id}')">
+          <div class="cat-color" style="background:${c.color}"></div>
+          <span class="cat-name">${c.name}</span>
+          <button class="btn btn-ghost" onclick="event.stopPropagation();deleteCategory('${c.id}')" title="Zmazať">×</button>
+        </div>
+      `).join('');
+
+      // Mobile chips
+      const mobile = document.getElementById('mobileCats');
+      mobile.innerHTML = state.categories.map(c => `
+        <div class="cat-chip" onclick="openCategoryPage('${c.id}')">
+          <span class="dot" style="background:${c.color}"></span>
+          ${c.name}
+        </div>
+      `).join('') + `
+        <div class="cat-chip" onclick="openCategoryModal()" style="border-style:dashed;opacity:0.75">
+          + Nová
+        </div>
+      `;
+
+      const select = document.getElementById('taskCategory');
+      select.innerHTML = state.categories.map(c =>
+        `<option value="${c.id}">${c.name}</option>`
+      ).join('');
+    }
+
+    // ===== MONTH =====
+    function renderMonth() {
+      const grid = document.getElementById('calendarGrid');
+      const year = state.currentDate.getFullYear();
+      const month = state.currentDate.getMonth();
+      document.getElementById('periodTitle').textContent = getMonthName(state.currentDate);
+
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      let startDay = firstDay.getDay();
+      startDay = startDay === 0 ? 6 : startDay - 1;
+
+      const days = state.lang === 'en'
+        ? ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+        : ['Po','Ut','St','Št','Pi','So','Ne'];
+      let html = days.map(d => `<div class="day-name">${d}</div>`).join('');
+
+      const prevLast = new Date(year, month, 0).getDate();
+      for (let i = startDay - 1; i >= 0; i--) {
+        html += `<div class="day-cell other-month"><span class="day-number">${prevLast - i}</span></div>`;
+      }
+
+      const todayStr = formatDate(new Date());
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isToday = dateStr === todayStr;
+        const isSelected = state.selectedDate === dateStr;
+        const dayTasks = state.tasks.filter(tk => tk.date === dateStr && !tk.done);
+        const meniny = getMeniny(dateStr);
+        const meninyShort = meniny ? meniny.split(',')[0].trim() : '';
+
+        let classes = 'day-cell';
+        if (isToday) classes += ' today';
+        if (isSelected) classes += ' selected';
+
+        const dots = dayTasks.slice(0,3).map(tk => {
+          const cat = state.categories.find(c => c.id === tk.categoryId);
+          return `<div class="dot" style="background:${cat ? cat.color : '#ccc'}"></div>`;
+        }).join('');
+
+        html += `
+          <div class="${classes}" onclick="selectDate('${dateStr}')" title="${meniny ? t('nameDay') + ': ' + meniny : ''}">
+            <span class="day-number">${d}</span>
+            ${meninyShort ? `<span class="day-meniny">${meninyShort}</span>` : ''}
+            <div class="day-dots">${dots}</div>
+          </div>
+        `;
+      }
+
+      const total = startDay + lastDay.getDate();
+      const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+      for (let i = 1; i <= remaining; i++) {
+        html += `<div class="day-cell other-month"><span class="day-number">${i}</span></div>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    // ===== WEEK =====
+    function renderWeek() {
+      const { monday, sunday } = getWeekRange(state.currentDate);
+      const grid = document.getElementById('weekGrid');
+      const startStr = monday.toLocaleDateString(loc(), { day:'numeric', month:'short' });
+      const endStr = sunday.toLocaleDateString(loc(), { day:'numeric', month:'short', year:'numeric' });
+      document.getElementById('periodTitle').textContent = `${startStr} – ${endStr}`;
+
+      const todayStr = formatDate(new Date());
+      let html = '';
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(monday);
+        day.setDate(monday.getDate() + i);
+        const dateStr = formatDate(day);
+        const isToday = dateStr === todayStr;
+        const dayName = day.toLocaleDateString(loc(), { weekday: 'long' });
+        const dayNum = day.getDate();
+        const dayTasks = state.tasks
+          .filter(t => t.date === dateStr)
+          .sort((a,b) => (a.time||'').localeCompare(b.time||''));
+
+        html += `
+          <div class="week-day ${isToday ? 'today' : ''}">
+            <div class="week-day-header">
+              <span>${dayName}</span>
+              <span style="opacity:0.7">${dayNum}</span>
+            </div>
+            ${dayTasks.map(t => {
+              const cat = state.categories.find(c => c.id === t.categoryId);
+              return `
+                <div class="week-task ${t.done ? 'done' : ''}"
+                     style="border-color:${cat ? cat.color : '#ccc'}"
+                     onclick="editTask('${t.id}')">
+                  ${t.time ? '<strong>' + t.time + '</strong> · ' : ''}${t.title}
+                </div>
+              `;
+            }).join('') || '<div style="font-size:0.82rem;color:var(--muted);opacity:0.5;padding:8px 0">Žiadne úlohy</div>'}
+          </div>
+        `;
+      }
+      grid.innerHTML = html;
+    }
+
+    // ===== LIST =====
+    function renderList() {
+      document.getElementById('periodTitle').textContent = t('backup');
+      const st = document.getElementById('backupStatus');
+      if (st && !st.dataset.keep) st.textContent = '';
+    }
+
+    function csvEscape(val) {
+      const s = String(val == null ? '' : val);
+      if (/[;"\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+
+    function exportToExcel() {
+      const headers = ['nazov','popis','datum','cas','kategoria','pripomienka','cas_pripomienky','hotovo'];
+      const rows = state.tasks.map(t => {
+        const cat = state.categories.find(c => c.id === t.categoryId);
+        return [
+          t.title || '',
+          t.desc || '',
+          t.date || '',
+          t.time || '',
+          cat ? cat.name : '',
+          t.reminder ? 'ano' : 'nie',
+          t.reminderTime || '',
+          t.done ? 'ano' : 'nie'
+        ].map(csvEscape).join(';');
+      });
+      const bom = '\uFEFF';
+      const csv = bom + headers.join(';') + '\n' + rows.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `diar-zaloha-${stamp}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      const st = document.getElementById('backupStatus');
+      if (st) {
+        st.textContent = `Exportované ${state.tasks.length} úloh. Súbor otvoríš v Exceli.`;
+        st.dataset.keep = '1';
+      }
+    }
+
+    function importFromExcel(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          let text = String(reader.result || '');
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+          const lines = text.split(/\r?\n/).filter(l => l.trim());
+          if (lines.length < 2) throw new Error('Prázdny súbor');
+
+          const sep = lines[0].includes(';') ? ';' : ',';
+          const splitLine = (line) => {
+            const out = [];
+            let cur = '', inQ = false;
+            for (let i = 0; i < line.length; i++) {
+              const ch = line[i];
+              if (ch === '"') {
+                if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+                else inQ = !inQ;
+              } else if (ch === sep && !inQ) {
+                out.push(cur); cur = '';
+              } else cur += ch;
+            }
+            out.push(cur);
+            return out;
+          };
+
+          const header = splitLine(lines[0]).map(h => h.trim().toLowerCase());
+          const idx = (names) => {
+            for (const n of names) {
+              const i = header.indexOf(n);
+              if (i >= 0) return i;
+            }
+            return -1;
+          };
+          const iTitle = idx(['nazov', 'názov', 'title']);
+          const iDesc = idx(['popis', 'desc', 'description']);
+          const iDate = idx(['datum', 'dátum', 'date']);
+          const iTime = idx(['cas', 'čas', 'time']);
+          const iCat = idx(['kategoria', 'kategória', 'category']);
+          const iRem = idx(['pripomienka', 'reminder']);
+          const iRemT = idx(['cas_pripomienky', 'čas_pripomienky', 'remindertime']);
+          const iDone = idx(['hotovo', 'done']);
+
+          if (iTitle < 0 || iDate < 0) throw new Error('Chýbajú stĺpce nazov a datum');
+
+          let added = 0;
+          for (let r = 1; r < lines.length; r++) {
+            const cols = splitLine(lines[r]);
+            const title = (cols[iTitle] || '').trim();
+            const date = (cols[iDate] || '').trim();
+            if (!title || !date) continue;
+
+            let catName = iCat >= 0 ? (cols[iCat] || '').trim() : '';
+            let cat = state.categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+            if (!cat && catName) {
+              cat = { id: 'c' + Date.now() + r, name: catName, color: PASTEL_COLORS[state.categories.length % PASTEL_COLORS.length] };
+              state.categories.push(cat);
+            }
+            if (!cat) cat = state.categories[0];
+
+            const yes = (v) => /^(ano|áno|yes|true|1)$/i.test((v || '').trim());
+            state.tasks.push({
+              id: 't' + Date.now() + r,
+              title,
+              desc: iDesc >= 0 ? (cols[iDesc] || '') : '',
+              date,
+              time: iTime >= 0 ? (cols[iTime] || '') : '',
+              categoryId: cat.id,
+              reminder: iRem >= 0 ? yes(cols[iRem]) : false,
+              reminderTime: iRemT >= 0 ? (cols[iRemT] || '') : '',
+              done: iDone >= 0 ? yes(cols[iDone]) : false,
+              notified: false
+            });
+            added++;
+          }
+          saveData();
+          render();
+          const st = document.getElementById('backupStatus');
+          if (st) {
+            st.textContent = `Importované ${added} úloh.`;
+            st.dataset.keep = '1';
+          }
+        } catch (err) {
+          const st = document.getElementById('backupStatus');
+          if (st) {
+            st.textContent = 'Import zlyhal: ' + (err.message || 'neplatný súbor');
+            st.dataset.keep = '1';
+          }
+        }
+        event.target.value = '';
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    function setReminderFilter(filter) {
+      state.reminderFilter = filter;
+      document.querySelectorAll('#reminderFilters .filter-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+      });
+      renderUpcoming();
+    }
+    function setReminderCatFilter(catId) {
+      state.reminderCatFilter = state.reminderCatFilter === catId ? null : catId;
+      renderUpcoming();
+    }
+    function renderUpcoming() {
+      const list = document.getElementById('upcomingList');
+      if (!list) return;
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfToday = new Date(startOfToday);
+      endOfToday.setDate(endOfToday.getDate() + 1);
+      const endOfWeek = new Date(startOfToday);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+      // Category filter chips
+      const catWrap = document.getElementById('reminderCatFilters');
+      if (catWrap) {
+        catWrap.innerHTML = state.categories.map(c => `
+          <button type="button" class="filter-chip ${state.reminderCatFilter === c.id ? 'active' : ''}"
+            onclick="setReminderCatFilter('${c.id}')"
+            style="${state.reminderCatFilter === c.id ? '' : `border-color:${c.color};color:${c.color}`}">
+            ${c.name}
+          </button>
+        `).join('');
+      }
+
+      let upcoming = state.tasks
+        .filter(t => t.reminder && t.reminderTime && !t.done)
+        .filter(t => new Date(t.reminderTime) > now);
+
+      if (state.reminderCatFilter) {
+        upcoming = upcoming.filter(t => t.categoryId === state.reminderCatFilter);
+      }
+
+      upcoming = upcoming.filter(t => {
+        const rem = new Date(t.reminderTime);
+        if (state.reminderFilter === 'today') return rem >= startOfToday && rem < endOfToday;
+        if (state.reminderFilter === 'week') return rem >= startOfToday && rem < endOfWeek;
+        if (state.reminderFilter === 'later') return rem >= endOfWeek;
+        return true; // all
+      });
+
+      upcoming.sort((a, b) => new Date(a.reminderTime) - new Date(b.reminderTime));
+
+      if (upcoming.length === 0) {
+        list.innerHTML = '<div class="empty-state" style="padding:12px">' + t('noReminders') + '</div>';
+        return;
+      }
+      list.innerHTML = upcoming.map(t => {
+        const cat = state.categories.find(c => c.id === t.categoryId);
+        const rem = new Date(t.reminderTime);
+        return `
+          <div class="upcoming-item" onclick="editTask('${t.id}')">
+            <div style="font-weight:600">${t.title}</div>
+            <div style="color:var(--muted);font-size:0.78rem;margin-top:2px">
+              ${rem.toLocaleString(loc(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+              · <span style="color:${cat ? cat.color : '#999'}">${cat ? cat.name : ''}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ===== VIEW =====
+    function setView(view) {
+      state.currentView = view;
+      document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+      });
+      document.getElementById('monthView').style.display = view === 'month' ? 'block' : 'none';
+      document.getElementById('weekView').style.display = view === 'week' ? 'block' : 'none';
+      document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+      document.getElementById('notesView').style.display = view === 'notes' ? 'block' : 'none';
+      const sv = document.getElementById('settingsView');
+      if (sv) sv.style.display = view === 'settings' ? 'block' : 'none';
+      // Hide nav arrows on notes / backup / settings
+      document.querySelector('.nav-btns').style.display = (view === 'notes' || view === 'list' || view === 'settings') ? 'none' : 'flex';
+      const fab = document.getElementById('fab');
+      if (fab) fab.style.display = view === 'settings' ? 'none' : '';
+      if (view === 'settings') {
+        document.getElementById('periodTitle').textContent = t('settings');
+        renderThemeDots();
+      }
+      render();
+    }
+    function changePeriod(dir) {
+      if (state.currentView === 'month') state.currentDate.setMonth(state.currentDate.getMonth() + dir);
+      else if (state.currentView === 'week') state.currentDate.setDate(state.currentDate.getDate() + dir * 7);
+      render();
+    }
+    function goToday() {
+      state.currentDate = new Date();
+      state.selectedDate = formatDate(new Date());
+      render();
+    }
+    function selectDate(dateStr) {
+      state.selectedDate = dateStr;
+      if (state.currentView === 'month') {
+        renderMonth();
+        renderDayDetail(dateStr);
+      } else {
+        openTaskModal(dateStr);
+      }
+    }
+    function closeDayDetail() {
+      state.selectedDate = null;
+      const el = document.getElementById('dayDetail');
+      if (el) el.style.display = 'none';
+      if (state.currentView === 'month') renderMonth();
+    }
+    function renderDayDetail(dateStr) {
+      const el = document.getElementById('dayDetail');
+      if (!el) return;
+      el.style.display = 'block';
+      const d = parseDate(dateStr);
+      const title = d.toLocaleDateString(loc(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      document.getElementById('dayDetailTitle').textContent = title.charAt(0).toUpperCase() + title.slice(1);
+      const meniny = getMeniny(dateStr);
+      document.getElementById('dayDetailMeniny').innerHTML = meniny
+        ? `<span class="meniny-icon">💐</span> ${t('nameDay')}: <strong>${meniny}</strong>`
+        : '';
+
+      const list = document.getElementById('dayDetailTasks');
+      const dayTasks = state.tasks
+        .filter(t => t.date === dateStr)
+        .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+      if (!dayTasks.length) {
+        list.innerHTML = '<div class="empty-state" style="padding:16px">' + t('noTasksDay') + '</div>';
+        return;
+      }
+      list.innerHTML = dayTasks.map(t => {
+        const cat = state.categories.find(c => c.id === t.categoryId);
+        return `
+          <div class="task-item ${t.done ? 'done' : ''}">
+            <div class="task-check ${t.done ? 'checked' : ''}" onclick="toggleDone('${t.id}')">${t.done ? '✓' : ''}</div>
+            <div class="task-body" onclick="editTask('${t.id}')">
+              <div class="task-title">${t.title}</div>
+              <div class="task-meta">
+                ${t.time ? t.time + ' · ' : ''}
+                ${cat ? cat.name : ''}
+                ${t.reminder ? ' · 🔔' : ''}
+              </div>
+            </div>
+            <div class="task-actions">
+              <button class="icon-btn" onclick="editTask('${t.id}')">✏️</button>
+              <button class="icon-btn" onclick="deleteTask('${t.id}')">🗑</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ===== MODALS =====
+    function openTaskModal(prefillDate = null, taskId = null, forceCategoryId = null) {
+      document.getElementById('taskForm').reset();
+      document.getElementById('taskId').value = '';
+      document.getElementById('reminderTimeGroup').style.display = 'none';
+
+      if (taskId) {
+        const task = state.tasks.find(x => x.id === taskId);
+        if (!task) return;
+        document.getElementById('taskModalTitle').textContent = t('taskEdit');
+        document.getElementById('taskId').value = task.id;
+        document.getElementById('taskTitle').value = task.title;
+        document.getElementById('taskDesc').value = task.desc || '';
+        document.getElementById('taskDate').value = task.date;
+        document.getElementById('taskTime').value = task.time || '';
+        document.getElementById('taskCategory').value = task.categoryId;
+        document.getElementById('taskReminder').checked = !!task.reminder;
+        if (task.reminder && task.reminderTime) {
+          document.getElementById('reminderTimeGroup').style.display = 'block';
+          document.getElementById('reminderTime').value = task.reminderTime.slice(0,16);
+        }
+      } else {
+        document.getElementById('taskModalTitle').textContent = t('taskNew');
+        document.getElementById('taskDate').value = prefillDate || formatDate(new Date());
+        if (forceCategoryId) document.getElementById('taskCategory').value = forceCategoryId;
+      }
+      document.getElementById('taskModal').classList.add('open');
+    }
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.remove('open');
+    }
+    function editTask(id) { openTaskModal(null, id); }
+
+    function openCategoryModal() {
+      document.getElementById('categoryForm').reset();
+      state.selectedColor = PASTEL_COLORS[0];
+      renderColorPicker();
+      document.getElementById('categoryModal').classList.add('open');
+    }
+    function closeCategoryModal() {
+      document.getElementById('categoryModal').classList.remove('open');
+    }
+    function renderColorPicker() {
+      document.getElementById('colorPicker').innerHTML = PASTEL_COLORS.map(c => `
+        <div class="color-option ${c === state.selectedColor ? 'selected' : ''}"
+             style="background:${c}"
+             onclick="state.selectedColor='${c}';renderColorPicker()"></div>
+      `).join('');
+    }
+
+    // ===== ACTIONS =====
+    function toggleDone(id) {
+      const t = state.tasks.find(x => x.id === id);
+      if (t) {
+        t.done = !t.done;
+        saveData();
+        if (state.openCategoryId) renderCategoryPage();
+        else render();
+      }
+    }
+    let confirmCallback = null;
+
+    function openConfirmModal(title, message, onConfirm, icon = '⚠️') {
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmMessage').textContent = message;
+      document.getElementById('confirmIcon').textContent = icon;
+      document.getElementById('confirmOkBtn').textContent = 'Vymazať';
+      confirmCallback = onConfirm;
+      document.getElementById('confirmModal').classList.add('open');
+    }
+    function closeConfirmModal() {
+      document.getElementById('confirmModal').classList.remove('open');
+      confirmCallback = null;
+      document.getElementById('confirmOkBtn').textContent = 'Vymazať';
+    }
+    document.getElementById('confirmOkBtn').addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+      closeConfirmModal();
+    });
+
+    function deleteTask(id) {
+      openConfirmModal(
+        'Vymazať úlohu?',
+        'Táto úloha sa natrvalo odstráni. Túto akciu nemôžeš vrátiť späť.',
+        () => {
+          state.tasks = state.tasks.filter(t => t.id !== id);
+          saveData();
+          if (state.openCategoryId) renderCategoryPage();
+          else render();
+        },
+        '🗑'
+      );
+    }
+    function deleteCategory(id) {
+      if (state.tasks.some(t => t.categoryId === id)) {
+        openConfirmModal(
+          'Kategóriu nemožno zmazať',
+          'Táto kategória sa stále používa v úlohách. Najprv úlohy zmeň alebo zmaž, potom môžeš kategóriu odstrániť.',
+          () => {},
+          '🔒'
+        );
+        setTimeout(() => {
+          document.getElementById('confirmOkBtn').textContent = 'Rozumiem';
+        }, 0);
+        return;
+      }
+      const cat = state.categories.find(c => c.id === id);
+      document.getElementById('confirmOkBtn').textContent = 'Vymazať';
+      openConfirmModal(
+        'Vymazať kategóriu?',
+        `Naozaj chceš zmazať kategóriu „${cat ? cat.name : ''}“? Túto akciu nemôžeš vrátiť späť.`,
+        () => {
+          state.categories = state.categories.filter(c => c.id !== id);
+          saveData();
+          if (state.openCategoryId === id) {
+            closeCategoryPage();
+          } else {
+            render();
+          }
+        },
+        '🗑'
+      );
+    }
+    function deleteCategoryFromPage() {
+      if (!state.openCategoryId) return;
+      deleteCategory(state.openCategoryId);
+    }
+
+    // ===== FORMS =====
+    document.getElementById('taskForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const id = document.getElementById('taskId').value;
+      const data = {
+        title: document.getElementById('taskTitle').value.trim(),
+        desc: document.getElementById('taskDesc').value.trim(),
+        date: document.getElementById('taskDate').value,
+        time: document.getElementById('taskTime').value,
+        categoryId: document.getElementById('taskCategory').value,
+        reminder: document.getElementById('taskReminder').checked,
+        reminderTime: document.getElementById('taskReminder').checked
+          ? document.getElementById('reminderTime').value : null,
+        done: false
+      };
+      if (id) {
+        const t = state.tasks.find(x => x.id === id);
+        Object.assign(t, data);
+      } else {
+        data.id = uid();
+        state.tasks.push(data);
+      }
+      saveData();
+      closeTaskModal();
+      if (state.openCategoryId) renderCategoryPage();
+      else render();
+      requestNotificationPermission();
+    });
+
+    document.getElementById('categoryForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const name = document.getElementById('catName').value.trim();
+      if (!name) return;
+      state.categories.push({ id: uid(), name, color: state.selectedColor });
+      saveData();
+      closeCategoryModal();
+      render();
+    });
+
+    document.getElementById('taskReminder').addEventListener('change', e => {
+      document.getElementById('reminderTimeGroup').style.display = e.target.checked ? 'block' : 'none';
+      if (e.target.checked && !document.getElementById('reminderTime').value) {
+        const date = document.getElementById('taskDate').value;
+        const time = document.getElementById('taskTime').value || '09:00';
+        document.getElementById('reminderTime').value = `${date}T${time}`;
+      }
+    });
+
+    // Close modal on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target === el) el.classList.remove('open');
+      });
+    });
+
+    function requestNotificationPermission() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
+    // Soft two-tone chime via Web Audio (no external file)
+    function playReminderSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99]; // C5 E5 G5
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(0.18, now + 0.02 + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45 + i * 0.12);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.12);
+          osc.stop(now + 0.5 + i * 0.12);
+        });
+        setTimeout(() => ctx.close(), 1500);
+      } catch (e) { /* ignore */ }
+    }
+
+    let _activeReminderTaskId = null;
+
+    function showReminderAlert(task) {
+      _activeReminderTaskId = task.id;
+      document.getElementById('rcTitle').textContent = task.title || 'Pripomienka';
+      const timeStr = task.time || '';
+      document.getElementById('rcSub').textContent = timeStr
+        ? `Nastavený čas: ${timeStr}`
+        : 'Čas tvojej úlohy práve nastal';
+      document.getElementById('reminderOverlay').classList.add('show');
+      document.getElementById('rcDoneBtn').onclick = () => {
+        if (_activeReminderTaskId) toggleDone(_activeReminderTaskId);
+        hideReminderAlert();
+      };
+    }
+    function hideReminderAlert() {
+      document.getElementById('reminderOverlay').classList.remove('show');
+      _activeReminderTaskId = null;
+    }
+
+    function fireReminder(task) {
+      playReminderSound();
+      if (navigator.vibrate) navigator.vibrate([140, 70, 140, 70, 200]);
+      showReminderAlert(task);
+      // Blink tab title
+      const orig = document.title;
+      let n = 0;
+      const blink = setInterval(() => {
+        document.title = (n % 2 === 0) ? '🔔 Pripomienka!' : orig;
+        if (++n > 10) { clearInterval(blink); document.title = orig; }
+      }, 500);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification('Pripomienka – Diár', {
+            body: task.title,
+            icon: './icon-192.png',
+            tag: 'diar-' + task.id
+          });
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    function checkReminders() {
+      const now = new Date();
+      let changed = false;
+      state.tasks.forEach(t => {
+        if (t.reminder && t.reminderTime && !t.done && !t.notified) {
+          const rem = new Date(t.reminderTime);
+          // trigger within last 90 seconds of due time
+          if (rem <= now && rem > new Date(now - 90000)) {
+            fireReminder(t);
+            t.notified = true;
+            changed = true;
+          }
+        }
+      });
+      if (changed) {
+        saveData();
+        renderUpcoming();
+      }
+    }
+
+    function render() {
+      renderCategories();
+      if (state.currentView === 'month') {
+        renderMonth();
+        if (state.selectedDate) renderDayDetail(state.selectedDate);
+      } else if (state.currentView === 'week') renderWeek();
+      else if (state.currentView === 'list') renderList();
+      else if (state.currentView === 'notes') renderNotes();
+      renderUpcoming();
+    }
+
+    const WMO_ICONS = {
+      0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️',
+      45: '🌫', 48: '🌫',
+      51: '🌦', 53: '🌦', 55: '🌧',
+      61: '🌧', 63: '🌧', 65: '🌧',
+      71: '❄️', 73: '❄️', 75: '❄️', 77: '🌨',
+      80: '🌦', 81: '🌧', 82: '⛈',
+      95: '⛈', 96: '⛈', 99: '⛈'
+    };
+
+    async function reverseGeocode(lat, lon) {
+      try {
+        const lang = state.lang === 'en' ? 'en' : 'sk';
+        const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=${lang}`);
+        if (!r.ok) return '';
+        const j = await r.json();
+        return j.city || j.locality || j.principalSubdivision || '';
+      } catch {
+        return '';
+      }
+    }
+
+    async function fetchWeather(lat, lon) {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('weather');
+      return r.json();
+    }
+
+    function setWeatherUI(icon, temp, place) {
+      const ic = document.getElementById('weatherIcon');
+      const te = document.getElementById('weatherTemp');
+      const pl = document.getElementById('weatherPlace');
+      if (ic) ic.textContent = icon;
+      if (te) te.textContent = temp;
+      if (pl) pl.textContent = place || '';
+    }
+
+    async function refreshWeather() {
+      setWeatherUI('…', '', state.lang === 'en' ? 'Locating…' : 'Hľadám…');
+      if (!navigator.geolocation) {
+        setWeatherUI('—', '', state.lang === 'en' ? 'No GPS' : 'Bez GPS');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          localStorage.setItem('zlatkoDiary_geo', JSON.stringify({ lat, lon, t: Date.now() }));
+          const data = await fetchWeather(lat, lon);
+          const cur = data.current || {};
+          const code = cur.weather_code;
+          const temp = (cur.temperature_2m != null)
+            ? Math.round(cur.temperature_2m) + '°'
+            : '';
+          const icon = WMO_ICONS[code] || '🌡';
+          let place = '';
+          try { place = await reverseGeocode(lat, lon); } catch (e) {}
+          setWeatherUI(icon, temp, place);
+        } catch (e) {
+          setWeatherUI('—', '', state.lang === 'en' ? 'Error' : 'Chyba');
+        }
+      }, () => {
+        setWeatherUI('—', '', state.lang === 'en' ? 'Denied' : 'Zamietnuté');
+      }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 });
+    }
+
+    function initWeather() {
+      try {
+        const raw = localStorage.getItem('zlatkoDiary_geo');
+        if (raw) {
+          const g = JSON.parse(raw);
+          if (g.lat && g.lon && Date.now() - (g.t || 0) < 30 * 60 * 1000) {
+            fetchWeather(g.lat, g.lon).then(async (data) => {
+              const cur = data.current || {};
+              const icon = WMO_ICONS[cur.weather_code] || '🌡';
+              const temp = cur.temperature_2m != null ? Math.round(cur.temperature_2m) + '°' : '';
+              let place = '';
+              try { place = await reverseGeocode(g.lat, g.lon); } catch (e) {}
+              setWeatherUI(icon, temp, place);
+            }).catch(() => refreshWeather());
+            return;
+          }
+        }
+      } catch (e) {}
+      refreshWeather();
+    }
+
+    loadData();
+    renderThemeDots();
+    applyTheme(state.theme);
+    applyI18n();
+    render();
+    initWeather();
+    requestNotificationPermission();
+    setInterval(checkReminders, 10000);
+    // Also check when tab becomes visible again
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) checkReminders();
+    });
+    // Unlock audio after first tap (browser policy)
+    document.addEventListener('click', function unlockAudioOnce() {
+      try {
+        const c = new (window.AudioContext || window.webkitAudioContext)();
+        c.resume().then(() => c.close());
+      } catch (e) {}
+      document.removeEventListener('click', unlockAudioOnce);
+    }, { once: true });
+
+    // Service Worker (PWA) – offline cache
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
+    // ===== OneSignal push (optional) =====
+    // 1. Vytvor účet na https://onesignal.com (zdarma)
+    // 2. New App → Web
+    // 3. Site URL = tvoja GitHub Pages adresa (https://...)
+    // 4. Skopíruj App ID sem:
+    const ONESIGNAL_APP_ID = ''; // napr. 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+
+    if (ONESIGNAL_APP_ID) {
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function (OneSignal) {
+        await OneSignal.init({
+          appId: ONESIGNAL_APP_ID,
+          serviceWorkerPath: 'OneSignalSDKWorker.js',
+          serviceWorkerParam: { scope: '/' },
+          notifyButton: { enable: false },
+          promptOptions: {
+            slidedown: {
+              prompts: [{
+                type: 'push',
+                autoPrompt: true,
+                text: {
+                  actionMessage: 'Chceš dostávať pripomienky z Diára aj keď je appka zatvorená?',
+                  acceptButton: 'Áno, povoliť',
+                  cancelButton: 'Teraz nie'
+                }
+              }]
+            }
+          }
+        });
+      });
+    }
+  </script>
+</body>
+</html>
